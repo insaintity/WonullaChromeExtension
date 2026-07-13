@@ -20,6 +20,7 @@
   let welcomeShownForRecord = "";
   let saveTimer = null;
   let routeSignature = location.href;
+  const pendingResumeKey = "wonulla:pendingResume";
 
   function storageGet(keys) {
     return chrome.storage.local.get(keys);
@@ -314,6 +315,13 @@
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }
 
+  function recordDisplayLabel(record) {
+    if (record && record.series) {
+      return `${record.series.seriesTitle} ${record.series.episodeLabel}`;
+    }
+    return (record && record.sourceLabel) || "Page video";
+  }
+
   function relativeDate(timestamp) {
     if (!timestamp) return "";
     const diff = Date.now() - timestamp;
@@ -352,8 +360,8 @@
     if (!video || Number.isNaN(video.currentTime)) return;
 
     const settings = await getSettings();
-    const currentTime = Math.floor(video.currentTime || 0);
-    const duration = Number.isFinite(video.duration) ? Math.floor(video.duration) : 0;
+    const currentTime = Number(video.currentTime) || 0;
+    const duration = Number.isFinite(video.duration) ? Number(video.duration) : 0;
     const now = Date.now();
 
     if (!force) {
@@ -416,27 +424,106 @@
     if (existing) existing.remove();
   }
 
+  function sameSavedPage(record) {
+    return record && record.url === canonicalUrl();
+  }
+
+  function savePendingResume(record) {
+    try {
+      sessionStorage.setItem(
+        pendingResumeKey,
+        JSON.stringify({
+          key: record.key,
+          url: record.url,
+          currentTime: record.currentTime,
+          createdAt: Date.now()
+        })
+      );
+    } catch {
+      // Session storage can be blocked; the normal continue prompt will still appear.
+    }
+  }
+
+  function getPendingResume() {
+    try {
+      const value = JSON.parse(sessionStorage.getItem(pendingResumeKey) || "null");
+      if (!value || Date.now() - value.createdAt > 5 * 60 * 1000) {
+        sessionStorage.removeItem(pendingResumeKey);
+        return null;
+      }
+      return value;
+    } catch {
+      sessionStorage.removeItem(pendingResumeKey);
+      return null;
+    }
+  }
+
+  function clearPendingResume() {
+    try {
+      sessionStorage.removeItem(pendingResumeKey);
+    } catch {
+      // Ignore unavailable session storage.
+    }
+  }
+
+  function continueWatching(record) {
+    if (!record) return;
+
+    if (sameSavedPage(record)) {
+      const video = currentVideo();
+      if (video) {
+        seekVideo(video, record.currentTime);
+      } else {
+        savePendingResume(record);
+      }
+      removeWelcomeBack();
+      return;
+    }
+
+    savePendingResume(record);
+    location.assign(record.rawUrl || record.url);
+  }
+
+  function applyPendingResume(video) {
+    const pending = getPendingResume();
+    if (!pending || !video) return false;
+    if (pending.url !== canonicalUrl()) return false;
+
+    seekVideo(video, pending.currentTime);
+    clearPendingResume();
+    removeWelcomeBack();
+    return true;
+  }
+
   function showWelcomeBack(record) {
     if (!record || welcomeShownForRecord === `${record.key}:${record.updatedAt}`) return;
     removeWelcomeBack();
     welcomeShownForRecord = `${record.key}:${record.updatedAt}`;
 
-    const root = document.createElement("div");
-    root.id = "wonulla-watch-tracker-welcome";
-    root.style.cssText = [
+    const backdrop = document.createElement("div");
+    backdrop.id = "wonulla-watch-tracker-welcome";
+    backdrop.style.cssText = [
       "position:fixed",
-      "left:50%",
-      "top:16px",
-      "transform:translateX(-50%)",
+      "inset:0",
       "z-index:2147483647",
-      "width:min(520px,calc(100vw - 32px))",
-      "font:14px/1.4 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "padding:18px",
+      "background:rgba(0,0,0,.45)",
+      "font:14px/1.4 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+    ].join(";");
+
+    const root = document.createElement("div");
+    root.style.cssText = [
+      "position:relative",
+      "width:min(460px,calc(100vw - 36px))",
       "color:#f8fafc",
       "background:#111827",
       "border:1px solid rgba(255,255,255,.16)",
       "box-shadow:0 12px 40px rgba(0,0,0,.35)",
       "border-radius:8px",
-      "padding:12px 42px 12px 14px"
+      "padding:16px"
     ].join(";");
 
     const close = document.createElement("button");
@@ -463,25 +550,42 @@
     title.style.cssText = "font-size:12px;font-weight:800;text-transform:uppercase;color:#93c5fd;margin-bottom:3px";
 
     const message = document.createElement("div");
-    message.textContent = `You last watched ${record.title || "Untitled video"} at ${formatSeconds(record.currentTime)}.`;
-    message.style.cssText = "font-weight:700";
+    message.textContent = `You were last watching ${record.title || "Untitled video"} at ${formatSeconds(record.currentTime)}.`;
+    message.style.cssText = "font-size:16px;font-weight:700;margin-right:28px";
 
     const detail = document.createElement("div");
-    const sourceDetail = record.series
-      ? `${record.series.seriesTitle} ${record.series.episodeLabel}`
-      : record.sourceLabel || "Page video";
-    detail.textContent = `${sourceDetail} saved ${relativeDate(record.updatedAt)}`;
-    detail.style.cssText = "margin-top:3px;color:#cbd5e1;font-size:12px";
+    detail.textContent = `${recordDisplayLabel(record)} saved ${relativeDate(record.updatedAt)}`;
+    detail.style.cssText = "margin-top:6px;color:#cbd5e1;font-size:12px";
 
-    root.append(close, title, message, detail);
-    document.documentElement.append(root);
+    const question = document.createElement("div");
+    question.textContent = "Want to continue?";
+    question.style.cssText = "margin-top:12px;color:#f8fafc";
 
-    window.setTimeout(() => {
-      if (root.isConnected) root.remove();
-    }, 9000);
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:16px";
+
+    const no = document.createElement("button");
+    no.type = "button";
+    no.textContent = "No";
+    no.style.cssText = "cursor:pointer;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:8px 12px;background:transparent;color:#f8fafc;font-weight:700";
+    no.addEventListener("click", removeWelcomeBack);
+
+    const yes = document.createElement("button");
+    yes.type = "button";
+    yes.textContent = "Yes";
+    yes.style.cssText = "cursor:pointer;border:0;border-radius:6px;padding:8px 14px;background:#38bdf8;color:#082f49;font-weight:800";
+    yes.addEventListener("click", () => continueWatching(record));
+
+    actions.append(no, yes);
+    root.append(close, title, message, detail, question, actions);
+    backdrop.append(root);
+    document.documentElement.append(backdrop);
   }
 
   async function maybeShowWelcomeBack() {
+    const pending = getPendingResume();
+    if (pending && pending.url === canonicalUrl()) return;
+
     const result = await storageGet(STORAGE_KEYS.lastWatch);
     const record = result[STORAGE_KEYS.lastWatch];
     if (!record || !record.currentTime) return;
@@ -565,6 +669,8 @@
   }
 
   async function maybeResume(video) {
+    if (applyPendingResume(video)) return;
+
     const key = mediaKey(video);
     if (promptShownForKey === key) return;
 
@@ -582,8 +688,6 @@
     promptShownForKey = key;
     if (settings.autoResume) {
       seekVideo(video, record.currentTime);
-    } else if (settings.promptResume) {
-      showPrompt(record, video);
     }
   }
 

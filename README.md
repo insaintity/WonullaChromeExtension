@@ -9,7 +9,7 @@ It is built for local installation as an unpacked Chrome extension.
 - Tracks videos on `wonulla.to` and subdomains.
 - Starts saving after 30 seconds watched.
 - Updates saved playback progress every 10 seconds.
-- Shows a welcome-back message on the site with the last watched title and timestamp.
+- Shows a continue-watching prompt on the site with the last watched title and timestamp.
 - Stores recent watch history in the extension popup.
 - Detects common TV episode formats such as `S01E03`, `1x03`, `Season 1 Episode 3`, `Episode 3`, and `Ep 3`.
 - Replaces older entries from the same TV series when a newer episode is watched.
@@ -64,7 +64,8 @@ If you installed from ZIP, download the newest ZIP, replace the old folder, then
 2. Watch for at least 30 seconds.
 3. The extension saves your current timestamp every 10 seconds.
 4. Click the extension icon to see your last watched video and recent entries.
-5. When you return to `wonulla.to`, the page shows a welcome-back message with your last watched title and time.
+5. When you return to `wonulla.to`, the page asks whether you want to continue from your last saved title and time.
+6. Click **Yes** to open the saved page and seek back to the saved timestamp.
 
 ## Options
 
