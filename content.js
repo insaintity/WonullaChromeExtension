@@ -100,7 +100,23 @@
   }
 
   function isGenericTitle(value) {
-    return /^(wonulla|home|movies|tv shows?|watch|search|untitled video)$/i.test(cleanText(value));
+    return /^(wonulla|home|movies|tv shows?|watch|search|seasons?|episodes?|untitled video)$/i.test(cleanText(value));
+  }
+
+  function isRejectedTitle(value) {
+    const text = cleanText(value);
+    return (
+      !text ||
+      isGenericTitle(text) ||
+      /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(text) ||
+      /^(season\s+\d+|\d+|air date[:\s].*)$/i.test(text) ||
+      /\b(add to favorites|watch later|download|logout|sign out|profile|account)\b/i.test(text)
+    );
+  }
+
+  function isVisibleElement(element) {
+    const style = window.getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
   }
 
   function metaContent(selector) {
@@ -123,8 +139,9 @@
         ].join(",")
       )
     )
+      .filter(isVisibleElement)
       .map((element) => cleanText(element.textContent))
-      .filter((text) => text.length >= 2 && text.length <= 140 && !isGenericTitle(text));
+      .filter((text) => text.length >= 2 && text.length <= 140 && !isRejectedTitle(text));
   }
 
   function pageTitle() {
@@ -134,7 +151,7 @@
       metaContent("meta[name='twitter:title']"),
       document.title,
       titleFromUrl()
-    ].filter((text) => text && !isGenericTitle(text));
+    ].filter((text) => text && !isRejectedTitle(text));
 
     return candidates[0] || "Untitled video";
   }
@@ -222,10 +239,19 @@
       stripEpisodeMarker(pageTitle(), marker),
       stripEpisodeMarker(titleFromUrl(), marker),
       stripEpisodeMarker(routeText(), marker)
-    ].filter((candidate) => candidate && !isGenericTitle(candidate));
+    ].filter((candidate) => candidate && !isRejectedTitle(candidate));
 
     const selected = candidates.find((candidate) => candidate.length >= 2 && candidate.length <= 100);
     return selected || pageTitle() || "Unknown series";
+  }
+
+  function episodeTitleFromCandidates(seriesTitle) {
+    const seriesKey = normalizeSeriesText(seriesTitle);
+    const candidates = candidateTitleElements()
+      .filter((candidate) => normalizeSeriesText(candidate) !== seriesKey)
+      .filter((candidate) => !/^season\s+\d+/i.test(candidate));
+
+    return candidates[candidates.length - 1] || "";
   }
 
   function parseEpisodeInfo() {
@@ -264,10 +290,12 @@
 
     const marker = match[0];
     const seriesTitle = seriesTitleFromEpisodeMatch(matchedText, marker);
+    const episodeTitle = episodeTitleFromCandidates(seriesTitle);
 
     return {
       seriesKey: `series:${normalizeSeriesText(seriesTitle)}`,
       seriesTitle,
+      episodeTitle,
       season,
       episode,
       episodeSort: season * 1000 + episode,
@@ -333,14 +361,15 @@
       if (now - lastSavedAt < settings.saveIntervalSeconds * 1000) return;
     }
 
+    const series = parseEpisodeInfo();
     const record = {
       key: mediaKey(video),
       url: canonicalUrl(),
       rawUrl: location.href,
-      title: pageTitle(),
+      title: (series && series.episodeTitle) || pageTitle(),
       sourceUrl: sourceUrl(video),
       sourceLabel: sourceLabel(video),
-      series: parseEpisodeInfo(),
+      series,
       currentTime,
       duration,
       progress: duration > 0 ? currentTime / duration : 0,
