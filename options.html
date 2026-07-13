@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wonulla Watch Tracker Options</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <h1>Wonulla Watch Tracker</h1>
+
+      <section>
+        <label>
+          <input id="promptResume" type="checkbox">
+          Prompt before resuming saved progress
+        </label>
+
+        <label>
+          <input id="autoResume" type="checkbox">
+          Resume automatically without prompting
+        </label>
+      </section>
+
+      <section>
+        <label for="minSaveSeconds">Minimum watch time before saving</label>
+        <input id="minSaveSeconds" type="number" min="0" max="300" step="1">
+
+        <label for="saveIntervalSeconds">Save interval while watching</label>
+        <input id="saveIntervalSeconds" type="number" min="2" max="60" step="1">
+      </section>
+
+      <section class="actions">
+        <button id="save" type="button">Save options</button>
+        <button id="clear" type="button" class="secondary">Clear watch history</button>
+      </section>
+
+      <p id="status" role="status"></p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

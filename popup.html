@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wonulla Watch Tracker</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Watch Tracker</h1>
+        <a href="options.html" target="_blank" title="Options">Options</a>
+      </header>
+
+      <section id="empty" hidden>
+        <p>No saved watch progress yet.</p>
+      </section>
+
+      <section id="last" hidden>
+        <div class="label">Last watched</div>
+        <h2 id="title"></h2>
+        <div id="source" class="source"></div>
+        <div class="meta">
+          <span id="time"></span>
+          <span id="updated"></span>
+        </div>
+        <progress id="progress" value="0" max="1"></progress>
+        <button id="open" type="button">Open video</button>
+      </section>
+
+      <section id="history" hidden>
+        <div class="label">Recent</div>
+        <div id="history-list"></div>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
