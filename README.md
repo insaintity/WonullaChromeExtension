@@ -7,8 +7,8 @@ It is built for local installation as an unpacked Chrome extension.
 ## Features
 
 - Tracks videos on `wonulla.to` and subdomains.
-- Starts saving after 30 seconds watched.
-- Updates saved playback progress every 10 seconds.
+- Starts saving as soon as playback begins.
+- Updates saved playback progress about once per second.
 - Shows a continue-watching prompt on the site with the last watched title and timestamp.
 - Stores recent watch history in the extension popup.
 - Detects common TV episode formats such as `S01E03`, `1x03`, `Season 1 Episode 3`, `Episode 3`, and `Ep 3`.
@@ -61,8 +61,8 @@ If you installed from ZIP, download the newest ZIP, replace the old folder, then
 ## Use
 
 1. Open a video on `wonulla.to`.
-2. Watch for at least 30 seconds.
-3. The extension saves your current timestamp every 10 seconds.
+2. Start playback.
+3. The extension saves your current timestamp about once per second.
 4. Click the extension icon to see your last watched video and recent entries.
 5. When you return to `wonulla.to`, the page asks whether you want to continue from your last saved title and time.
 6. Click **Yes** to open the saved page and seek back to the saved timestamp.
@@ -83,7 +83,7 @@ If progress is not saving:
 
 1. Reload the extension from `chrome://extensions`.
 2. Refresh the `wonulla.to` tab.
-3. Watch for at least 30 seconds.
+3. Start playback and wait a few seconds.
 4. Open the extension popup and check whether an entry appears.
 
 If TV episodes are not grouped correctly, the page may not expose clear episode text. The extension checks the rendered app text, selected episode controls, metadata, and URL, but unusual page labels can still need a parser tweak.

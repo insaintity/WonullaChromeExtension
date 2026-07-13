@@ -9,9 +9,9 @@
   const DEFAULT_SETTINGS = {
     autoResume: false,
     promptResume: true,
-    minSaveSeconds: 30,
-    saveIntervalSeconds: 10,
-    trackingDefaultsVersion: 2
+    minSaveSeconds: 0,
+    saveIntervalSeconds: 1,
+    trackingDefaultsVersion: 3
   };
 
   let activeVideo = null;
@@ -38,11 +38,11 @@
       ...stored
     };
 
-    if (!stored.trackingDefaultsVersion) {
-      if (!stored.minSaveSeconds || stored.minSaveSeconds === 10) {
+    if (stored.trackingDefaultsVersion !== DEFAULT_SETTINGS.trackingDefaultsVersion) {
+      if (!stored.trackingDefaultsVersion || stored.minSaveSeconds === 10 || stored.minSaveSeconds === 30) {
         settings.minSaveSeconds = DEFAULT_SETTINGS.minSaveSeconds;
       }
-      if (!stored.saveIntervalSeconds || stored.saveIntervalSeconds === 5) {
+      if (!stored.trackingDefaultsVersion || stored.saveIntervalSeconds === 5 || stored.saveIntervalSeconds === 10) {
         settings.saveIntervalSeconds = DEFAULT_SETTINGS.saveIntervalSeconds;
       }
       settings.trackingDefaultsVersion = DEFAULT_SETTINGS.trackingDefaultsVersion;
@@ -111,7 +111,7 @@
       isGenericTitle(text) ||
       /[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(text) ||
       /^(season\s+\d+|\d+|air date[:\s].*)$/i.test(text) ||
-      /\b(add to favorites|watch later|download|logout|sign out|profile|account)\b/i.test(text)
+      /\b(add to favorites|watch later|download|logout|sign out|profile|account|my name)\b/i.test(text)
     );
   }
 
@@ -178,6 +178,15 @@
   function visibleAppText() {
     const root = document.getElementById("root") || document.body;
     return cleanText((root && root.innerText) || "").slice(0, 6000);
+  }
+
+  function visibleAppLines() {
+    const root = document.getElementById("root") || document.body;
+    return String((root && root.innerText) || "")
+      .split(/\r?\n/)
+      .map(cleanText)
+      .filter(Boolean)
+      .slice(0, 300);
   }
 
   function routeText() {
@@ -255,6 +264,29 @@
     return candidates[candidates.length - 1] || "";
   }
 
+  function episodeTitleFromLines(season, episode, seriesTitle) {
+    const lines = visibleAppLines();
+    const seasonEpisodePattern = new RegExp(`^Season\\s*${season}\\s*,?\\s*Episode\\s*${episode}$`, "i");
+    const numberedEpisodePattern = new RegExp(`^${episode}\\s+(.+)$`);
+    const seriesKey = normalizeSeriesText(seriesTitle);
+
+    for (let index = 0; index < lines.length; index += 1) {
+      if (seasonEpisodePattern.test(lines[index])) {
+        const previous = lines[index - 1] || "";
+        if (!isRejectedTitle(previous) && normalizeSeriesText(previous) !== seriesKey) {
+          return previous;
+        }
+      }
+
+      const numberedMatch = lines[index].match(numberedEpisodePattern);
+      if (numberedMatch && !isRejectedTitle(numberedMatch[1])) {
+        return numberedMatch[1];
+      }
+    }
+
+    return "";
+  }
+
   function parseEpisodeInfo() {
     const patterns = [
       /\bS(?:eason)?\s*(\d{1,2})\s*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i,
@@ -291,7 +323,7 @@
 
     const marker = match[0];
     const seriesTitle = seriesTitleFromEpisodeMatch(matchedText, marker);
-    const episodeTitle = episodeTitleFromCandidates(seriesTitle);
+    const episodeTitle = episodeTitleFromLines(season, episode, seriesTitle) || episodeTitleFromCandidates(seriesTitle);
 
     return {
       seriesKey: `series:${normalizeSeriesText(seriesTitle)}`,

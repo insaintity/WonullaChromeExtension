@@ -8,9 +8,9 @@ const STORAGE_KEYS = {
 const DEFAULT_SETTINGS = {
   autoResume: false,
   promptResume: true,
-  minSaveSeconds: 30,
-  saveIntervalSeconds: 10,
-  trackingDefaultsVersion: 2
+  minSaveSeconds: 0,
+  saveIntervalSeconds: 1,
+  trackingDefaultsVersion: 3
 };
 
 const fields = {
@@ -37,11 +37,11 @@ async function loadSettings() {
     ...stored
   };
 
-  if (!stored.trackingDefaultsVersion) {
-    if (!stored.minSaveSeconds || stored.minSaveSeconds === 10) {
+  if (stored.trackingDefaultsVersion !== DEFAULT_SETTINGS.trackingDefaultsVersion) {
+    if (!stored.trackingDefaultsVersion || stored.minSaveSeconds === 10 || stored.minSaveSeconds === 30) {
       settings.minSaveSeconds = DEFAULT_SETTINGS.minSaveSeconds;
     }
-    if (!stored.saveIntervalSeconds || stored.saveIntervalSeconds === 5) {
+    if (!stored.trackingDefaultsVersion || stored.saveIntervalSeconds === 5 || stored.saveIntervalSeconds === 10) {
       settings.saveIntervalSeconds = DEFAULT_SETTINGS.saveIntervalSeconds;
     }
     settings.trackingDefaultsVersion = DEFAULT_SETTINGS.trackingDefaultsVersion;
@@ -59,7 +59,7 @@ async function saveSettings() {
     autoResume: fields.autoResume.checked,
     promptResume: fields.promptResume.checked,
     minSaveSeconds: Math.max(0, Number(fields.minSaveSeconds.value) || DEFAULT_SETTINGS.minSaveSeconds),
-    saveIntervalSeconds: Math.max(2, Number(fields.saveIntervalSeconds.value) || DEFAULT_SETTINGS.saveIntervalSeconds),
+    saveIntervalSeconds: Math.max(1, Number(fields.saveIntervalSeconds.value) || DEFAULT_SETTINGS.saveIntervalSeconds),
     trackingDefaultsVersion: DEFAULT_SETTINGS.trackingDefaultsVersion
   };
 
