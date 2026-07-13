@@ -9,8 +9,9 @@
   const DEFAULT_SETTINGS = {
     autoResume: false,
     promptResume: true,
-    minSaveSeconds: 10,
-    saveIntervalSeconds: 5
+    minSaveSeconds: 30,
+    saveIntervalSeconds: 10,
+    trackingDefaultsVersion: 2
   };
 
   let activeVideo = null;
@@ -28,11 +29,26 @@
     return chrome.storage.local.set(values);
   }
 
-  function getSettings() {
-    return storageGet(STORAGE_KEYS.settings).then((result) => ({
+  async function getSettings() {
+    const result = await storageGet(STORAGE_KEYS.settings);
+    const stored = result[STORAGE_KEYS.settings] || {};
+    const settings = {
       ...DEFAULT_SETTINGS,
-      ...(result[STORAGE_KEYS.settings] || {})
-    }));
+      ...stored
+    };
+
+    if (!stored.trackingDefaultsVersion) {
+      if (!stored.minSaveSeconds || stored.minSaveSeconds === 10) {
+        settings.minSaveSeconds = DEFAULT_SETTINGS.minSaveSeconds;
+      }
+      if (!stored.saveIntervalSeconds || stored.saveIntervalSeconds === 5) {
+        settings.saveIntervalSeconds = DEFAULT_SETTINGS.saveIntervalSeconds;
+      }
+      settings.trackingDefaultsVersion = DEFAULT_SETTINGS.trackingDefaultsVersion;
+      storageSet({ [STORAGE_KEYS.settings]: settings });
+    }
+
+    return settings;
   }
 
   function canonicalUrl() {
@@ -79,10 +95,48 @@
     }
   }
 
+  function cleanText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function isGenericTitle(value) {
+    return /^(wonulla|home|movies|tv shows?|watch|search|untitled video)$/i.test(cleanText(value));
+  }
+
+  function metaContent(selector) {
+    const node = document.querySelector(selector);
+    return node ? cleanText(node.getAttribute("content")) : "";
+  }
+
+  function candidateTitleElements() {
+    return Array.from(
+      document.querySelectorAll(
+        [
+          "h1",
+          "h2",
+          "h3",
+          "[class*='title' i]",
+          "[class*='name' i]",
+          "[class*='movie' i]",
+          "[class*='show' i]",
+          "[class*='series' i]"
+        ].join(",")
+      )
+    )
+      .map((element) => cleanText(element.textContent))
+      .filter((text) => text.length >= 2 && text.length <= 140 && !isGenericTitle(text));
+  }
+
   function pageTitle() {
-    const heading = document.querySelector("h1, h2, [class*='title' i]");
-    const text = heading && heading.textContent ? heading.textContent.trim() : "";
-    return text || document.title || "Untitled video";
+    const candidates = [
+      ...candidateTitleElements(),
+      metaContent("meta[property='og:title']"),
+      metaContent("meta[name='twitter:title']"),
+      document.title,
+      titleFromUrl()
+    ].filter((text) => text && !isGenericTitle(text));
+
+    return candidates[0] || "Untitled video";
   }
 
   function normalizeSeriesText(value) {
@@ -103,14 +157,83 @@
     return parts.length > 0 ? parts[parts.length - 1] : "";
   }
 
+  function visibleAppText() {
+    const root = document.getElementById("root") || document.body;
+    return cleanText((root && root.innerText) || "").slice(0, 6000);
+  }
+
+  function routeText() {
+    return cleanText(
+      decodeURIComponent(`${location.pathname} ${location.search}`)
+        .replace(/[/?#=&_.+-]+/g, " ")
+        .replace(/\b\d{4,}\b/g, " ")
+    );
+  }
+
+  function episodeSearchTexts() {
+    const activeTexts = Array.from(
+      document.querySelectorAll(
+        [
+          "[aria-current='true']",
+          "[aria-selected='true']",
+          "[class*='active' i]",
+          "[class*='selected' i]",
+          "[class*='current' i]",
+          "video"
+        ].join(",")
+      )
+    )
+      .map((element) => cleanText(element.textContent || element.getAttribute("aria-label") || element.title))
+      .filter(Boolean);
+
+    return [
+      pageTitle(),
+      routeText(),
+      ...activeTexts,
+      visibleAppText()
+    ].filter(Boolean);
+  }
+
+  function stripEpisodeMarker(value, marker) {
+    return cleanText(value)
+      .replace(marker, " ")
+      .replace(/\bS(?:eason)?\s*\d{1,2}\b/gi, " ")
+      .replace(/\bEpisode\s*\d{1,3}\b/gi, " ")
+      .replace(/\bEp\.?\s*\d{1,3}\b/gi, " ")
+      .replace(/\b\d{1,2}\s*x\s*\d{1,3}\b/gi, " ")
+      .replace(/\s*[-:|]\s*$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function titleFromEpisodeText(text, marker) {
+    const markerIndex = text.toLowerCase().indexOf(marker.toLowerCase());
+    if (markerIndex <= 0) return "";
+
+    return stripEpisodeMarker(text.slice(0, markerIndex), marker)
+      .split(/\b(?:watch|stream|play|season)\b/i)
+      .pop()
+      .trim();
+  }
+
+  function seriesTitleFromEpisodeMatch(text, marker) {
+    const candidates = [
+      titleFromEpisodeText(text, marker),
+      stripEpisodeMarker(pageTitle(), marker),
+      stripEpisodeMarker(titleFromUrl(), marker),
+      stripEpisodeMarker(routeText(), marker)
+    ].filter((candidate) => candidate && !isGenericTitle(candidate));
+
+    const selected = candidates.find((candidate) => candidate.length >= 2 && candidate.length <= 100);
+    return selected || pageTitle() || "Unknown series";
+  }
+
   function parseEpisodeInfo() {
-    const title = pageTitle();
-    const urlText = titleFromUrl();
-    const combined = `${title} ${urlText}`;
     const patterns = [
       /\bS(?:eason)?\s*(\d{1,2})\s*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i,
       /\b(\d{1,2})\s*x\s*(\d{1,3})\b/i,
       /\bSeason\s*(\d{1,2})\D{0,24}Episode\s*(\d{1,3})\b/i,
+      /\bSeason\s*(\d{1,2})\b[\s\S]{0,160}?\b(?:Episode|Ep\.?)\s*(\d{1,3})\b/i,
       /\bEpisode\s*(\d{1,3})\b/i,
       /\bEp\.?\s*(\d{1,3})\b/i
     ];
@@ -118,32 +241,29 @@
     let match = null;
     let season = 1;
     let episode = 0;
+    let matchedText = "";
 
-    for (const pattern of patterns) {
-      match = combined.match(pattern);
-      if (!match) continue;
+    for (const text of episodeSearchTexts()) {
+      for (const pattern of patterns) {
+        match = text.match(pattern);
+        if (!match) continue;
 
-      if (match.length >= 3) {
-        season = Number(match[1]) || 1;
-        episode = Number(match[2]) || 0;
-      } else {
-        episode = Number(match[1]) || 0;
+        if (match.length >= 3) {
+          season = Number(match[1]) || 1;
+          episode = Number(match[2]) || 0;
+        } else {
+          episode = Number(match[1]) || 0;
+        }
+        matchedText = text;
+        break;
       }
-      break;
+      if (match) break;
     }
 
     if (!match || !episode) return null;
 
     const marker = match[0];
-    const markerIndex = title.toLowerCase().indexOf(marker.toLowerCase());
-    const rawSeriesTitle = markerIndex > 0 ? title.slice(0, markerIndex) : title;
-    const seriesTitle =
-      rawSeriesTitle
-        .replace(/\s*[-:|]\s*$/g, "")
-        .replace(/\bS(?:eason)?\s*\d{1,2}\s*$/i, "")
-        .trim() ||
-      document.title.replace(marker, "").replace(/\s*[-:|]\s*$/g, "").trim() ||
-      "Unknown series";
+    const seriesTitle = seriesTitleFromEpisodeMatch(matchedText, marker);
 
     return {
       seriesKey: `series:${normalizeSeriesText(seriesTitle)}`,

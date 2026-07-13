@@ -8,8 +8,9 @@ const STORAGE_KEYS = {
 const DEFAULT_SETTINGS = {
   autoResume: false,
   promptResume: true,
-  minSaveSeconds: 10,
-  saveIntervalSeconds: 5
+  minSaveSeconds: 30,
+  saveIntervalSeconds: 10,
+  trackingDefaultsVersion: 2
 };
 
 const fields = {
@@ -30,10 +31,22 @@ function setStatus(message) {
 
 async function loadSettings() {
   const result = await chrome.storage.local.get(STORAGE_KEYS.settings);
+  const stored = result[STORAGE_KEYS.settings] || {};
   const settings = {
     ...DEFAULT_SETTINGS,
-    ...(result[STORAGE_KEYS.settings] || {})
+    ...stored
   };
+
+  if (!stored.trackingDefaultsVersion) {
+    if (!stored.minSaveSeconds || stored.minSaveSeconds === 10) {
+      settings.minSaveSeconds = DEFAULT_SETTINGS.minSaveSeconds;
+    }
+    if (!stored.saveIntervalSeconds || stored.saveIntervalSeconds === 5) {
+      settings.saveIntervalSeconds = DEFAULT_SETTINGS.saveIntervalSeconds;
+    }
+    settings.trackingDefaultsVersion = DEFAULT_SETTINGS.trackingDefaultsVersion;
+    await chrome.storage.local.set({ [STORAGE_KEYS.settings]: settings });
+  }
 
   fields.autoResume.checked = settings.autoResume;
   fields.promptResume.checked = settings.promptResume;
@@ -46,7 +59,8 @@ async function saveSettings() {
     autoResume: fields.autoResume.checked,
     promptResume: fields.promptResume.checked,
     minSaveSeconds: Math.max(0, Number(fields.minSaveSeconds.value) || DEFAULT_SETTINGS.minSaveSeconds),
-    saveIntervalSeconds: Math.max(2, Number(fields.saveIntervalSeconds.value) || DEFAULT_SETTINGS.saveIntervalSeconds)
+    saveIntervalSeconds: Math.max(2, Number(fields.saveIntervalSeconds.value) || DEFAULT_SETTINGS.saveIntervalSeconds),
+    trackingDefaultsVersion: DEFAULT_SETTINGS.trackingDefaultsVersion
   };
 
   if (settings.autoResume) {
