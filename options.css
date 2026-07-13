@@ -1,53 +1,79 @@
 :root {
   color-scheme: light dark;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --chrome-blue: #1a73e8;
+  --chrome-blue-hover: #1558b0;
+  --chrome-text: #202124;
+  --chrome-muted: #5f6368;
+  --chrome-border: #dadce0;
+  --chrome-surface: #ffffff;
+  --chrome-background: #ffffff;
+  --chrome-control: #ffffff;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 body {
   margin: 0;
-  color: #172033;
-  background: #f7f8fb;
+  color: var(--chrome-text);
+  background: var(--chrome-background);
+  font-size: 14px;
 }
 
 main {
-  max-width: 620px;
-  padding: 28px;
+  max-width: 720px;
+  padding: 28px 32px;
 }
 
 h1 {
-  margin: 0 0 18px;
-  font-size: 24px;
+  margin: 0 0 22px;
+  font-size: 22px;
+  font-weight: 400;
 }
 
 section {
   display: grid;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   padding: 16px;
-  background: #ffffff;
-  border: 1px solid #d9dee8;
+  background: var(--chrome-surface);
+  border: 1px solid var(--chrome-border);
   border-radius: 8px;
 }
 
 label {
   display: grid;
   gap: 6px;
-  font-weight: 650;
+  color: var(--chrome-text);
+  font-weight: 400;
 }
 
 label:has(input[type="checkbox"]) {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 28px;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--chrome-blue);
 }
 
 input[type="number"] {
   max-width: 160px;
   min-height: 34px;
   padding: 4px 8px;
-  border: 1px solid #c8d0dc;
-  border-radius: 6px;
+  color: var(--chrome-text);
+  background: var(--chrome-control);
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
   font: inherit;
+}
+
+input[type="number"]:focus {
+  border-color: var(--chrome-blue);
+  box-shadow: 0 0 0 1px var(--chrome-blue);
+  outline: none;
 }
 
 .actions {
@@ -59,44 +85,69 @@ input[type="number"] {
 button {
   min-height: 38px;
   padding: 0 14px;
-  border: 0;
-  border-radius: 6px;
-  background: #2563eb;
+  border: 1px solid var(--chrome-blue);
+  border-radius: 4px;
+  background: var(--chrome-blue);
   color: white;
   cursor: pointer;
-  font-weight: 700;
+  font: inherit;
+  font-weight: 500;
+}
+
+button:hover {
+  background: var(--chrome-blue-hover);
+  border-color: var(--chrome-blue-hover);
 }
 
 button.secondary {
-  background: #e5e7eb;
-  color: #172033;
+  background: transparent;
+  color: var(--chrome-blue);
+}
+
+button.secondary:hover {
+  background: rgba(26, 115, 232, .08);
+  border-color: var(--chrome-blue);
 }
 
 #status {
   min-height: 20px;
-  color: #2563eb;
-  font-weight: 650;
+  color: var(--chrome-blue);
+  font-weight: 500;
 }
 
 @media (prefers-color-scheme: dark) {
+  :root {
+    --chrome-blue: #8ab4f8;
+    --chrome-blue-hover: #aecbfa;
+    --chrome-text: #e8eaed;
+    --chrome-muted: #9aa0a6;
+    --chrome-border: #3c4043;
+    --chrome-surface: #202124;
+    --chrome-background: #202124;
+    --chrome-control: #303134;
+  }
+
   body {
-    color: #eef2f7;
-    background: #0f172a;
+    color: var(--chrome-text);
+    background: var(--chrome-background);
   }
 
   section {
-    background: #111827;
-    border-color: #293244;
+    background: var(--chrome-surface);
+    border-color: var(--chrome-border);
   }
 
   input[type="number"] {
-    color: #eef2f7;
-    background: #0f172a;
-    border-color: #3c475c;
+    color: var(--chrome-text);
+    background: var(--chrome-control);
+    border-color: var(--chrome-border);
   }
 
   button.secondary {
-    background: #293244;
-    color: #eef2f7;
+    color: var(--chrome-blue);
+  }
+
+  button:not(.secondary) {
+    color: #202124;
   }
 }
