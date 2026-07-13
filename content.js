@@ -468,6 +468,7 @@
           key: record.key,
           url: record.url,
           currentTime: record.currentTime,
+          autoplay: true,
           createdAt: Date.now()
         })
       );
@@ -504,7 +505,7 @@
     if (sameSavedPage(record)) {
       const video = currentVideo();
       if (video) {
-        seekVideo(video, record.currentTime);
+        seekAndPlay(video, record.currentTime);
       } else {
         savePendingResume(record);
       }
@@ -521,7 +522,11 @@
     if (!pending || !video) return false;
     if (pending.url !== canonicalUrl()) return false;
 
-    seekVideo(video, pending.currentTime);
+    if (pending.autoplay) {
+      seekAndPlay(video, pending.currentTime);
+    } else {
+      seekVideo(video, pending.currentTime);
+    }
     clearPendingResume();
     removeWelcomeBack();
     return true;
@@ -700,6 +705,75 @@
     }
   }
 
+  function showPlayFallback(video) {
+    const existing = document.getElementById("wonulla-watch-tracker-play-fallback");
+    if (existing) existing.remove();
+
+    const root = document.createElement("div");
+    root.id = "wonulla-watch-tracker-play-fallback";
+    root.style.cssText = [
+      "position:fixed",
+      "left:50%",
+      "bottom:24px",
+      "transform:translateX(-50%)",
+      "z-index:2147483647",
+      "font:14px/1.4 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      "color:#f8fafc",
+      "background:#111827",
+      "border:1px solid rgba(255,255,255,.16)",
+      "box-shadow:0 12px 40px rgba(0,0,0,.35)",
+      "border-radius:8px",
+      "padding:12px",
+      "display:flex",
+      "align-items:center",
+      "gap:10px"
+    ].join(";");
+
+    const message = document.createElement("span");
+    message.textContent = "Ready at saved time.";
+
+    const play = document.createElement("button");
+    play.type = "button";
+    play.textContent = "Play";
+    play.style.cssText = "cursor:pointer;border:0;border-radius:6px;padding:7px 12px;background:#38bdf8;color:#082f49;font-weight:800";
+    play.addEventListener("click", async () => {
+      try {
+        await video.play();
+        root.remove();
+      } catch {
+        message.textContent = "Press play in the video player.";
+      }
+    });
+
+    root.append(message, play);
+    document.documentElement.append(root);
+  }
+
+  async function playVideo(video) {
+    try {
+      await video.play();
+    } catch {
+      showPlayFallback(video);
+    }
+  }
+
+  function seekAndPlay(video, seconds) {
+    const playAfterSeek = () => {
+      video.removeEventListener("seeked", playAfterSeek);
+      playVideo(video);
+    };
+
+    video.addEventListener("seeked", playAfterSeek, { once: true });
+    seekVideo(video, seconds);
+
+    window.setTimeout(() => {
+      video.removeEventListener("seeked", playAfterSeek);
+      if (Math.abs((Number(video.currentTime) || 0) - (Number(seconds) || 0)) < 2) {
+        playVideo(video);
+      }
+    }, 1200);
+  }
+
   async function maybeResume(video) {
     if (applyPendingResume(video)) return;
 
@@ -719,7 +793,7 @@
 
     promptShownForKey = key;
     if (settings.autoResume) {
-      seekVideo(video, record.currentTime);
+      seekAndPlay(video, record.currentTime);
     }
   }
 

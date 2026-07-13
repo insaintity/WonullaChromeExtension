@@ -65,7 +65,7 @@ If you installed from ZIP, download the newest ZIP, replace the old folder, then
 3. The extension saves your current timestamp about once per second.
 4. Click the extension icon to see your last watched video and recent entries.
 5. When you return to `wonulla.to`, the page asks whether you want to continue from your last saved title and time.
-6. Click **Yes** to open the saved page and seek back to the saved timestamp.
+6. Click **Yes** to open the saved page, seek back to the saved timestamp, and start playback when Chrome allows it.
 
 ## Options
 
